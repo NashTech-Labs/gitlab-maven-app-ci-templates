@@ -1,0 +1,94 @@
+# __  __                       
+#|  \/  | __ ___   _____ _ __  
+#| |\/| |/ _` \ \ / / _ \ '_ \ 
+#| |  | | (_| |\ V /  __/ | | |
+#|_|  |_|\__,_| \_/ \___|_| |_|
+                              
+.maven_common_vars:
+    variables:
+        MAIN_CLASS: yourClass.java
+        SKIP_TEST_CASES: false
+
+.maven_compile:
+    extends: 
+        - .maven_common_vars
+    image: maven:3.8.5-openjdk-8
+    variables:
+    script:
+        - mvn clean compile
+
+.maven_install:
+    extends: 
+        - .maven_common_vars
+    image: maven:3.8.5-openjdk-8
+    artifacts:
+      paths:
+      - target/*.jar
+      expire_in: 1 day
+    variables:
+        SKIP_TEST: -Dmaven.test.skip=true
+    script:
+        - if [[ $SKIP_TEST_CASES ]]; then 
+        - mvn clean install $SKIP_TEST
+        - else
+        - mvn clean install
+
+.maven_test:
+    extends: 
+        - .maven_common_vars
+    image: maven:3.8.5-openjdk-8
+    variables:
+    script:
+        - mvn clean test 
+
+#  ____  ____ ____       _                          
+# / ___|/ ___|  _ \     / \   ___ ___  ___  ___ ___ 
+#| |  _| |   | |_) |   / _ \ / __/ __|/ _ \/ __/ __|
+#| |_| | |___|  __/   / ___ \ (__\__ \  __/\__ \__ \
+# \____|\____|_|     /_/   \_\___|___/\___||___/___/
+                                                   
+.gcp_access:
+  image: google/cloud-sdk
+  tags:
+    - gcp-secure
+  before_script:
+    - ENV=${ENV:-dev}; if [[ $ENV = "prod"* ]]; then SERVICEACC_KEY=$service_account_key_prod; elif [[ $ENV = "uat" ]]; then SERVICEACC_KEY=$service_account_key_uat; else SERVICEACC_KEY=$service_account_key_dev; fi
+    - export GOOGLE_APPLICATION_CREDENTIALS=$SERVICEACC_KEY
+    - if [[ $(command -v gcloud) ]]; then gcloud auth activate-service-account --key-file=$SERVICEACC_KEY; fi
+    - if [[ $(command -v docker) ]]; then echo "$(gcloud auth print-access-token)" | docker login -u oauth2accesstoken --password-stdin https://gcr.io; fi;
+
+
+# _____            _                                      _   
+#| ____|_ ____   _(_)_ __ ___  _ __  _ __ ___   ___ _ __ | |_ 
+#|  _| | '_ \ \ / / | '__/ _ \| '_ \| '_ ` _ \ / _ \ '_ \| __|
+#| |___| | | \ V /| | | | (_) | | | | | | | | |  __/ | | | |_ 
+#|_____|_| |_|\_/ |_|_|  \___/|_| |_|_| |_| |_|\___|_| |_|\__|
+                                                             
+.dev:
+  variables:
+    ENV: dev
+  environment:
+    name: dev
+
+.prod:
+  variables:
+    ENV: prod
+  environment:
+    name: prod
+  only:
+    - master
+    - main
+
+
+# ____             _             
+#|  _ \  ___   ___| | _____ _ __ 
+#| | | |/ _ \ / __| |/ / _ \ '__|
+#| |_| | (_) | (__|   <  __/ |   
+#|____/ \___/ \___|_|\_\___|_|   
+                                
+.deploy_docker_common:
+  extends: .gcp_access
+  image: docker:latest
+  variables:
+    DOCKER_IMAGE_PATH: gcr.io/${RELEASE_PROJECT}/${DOCKER_IMAGE_NAME}
+

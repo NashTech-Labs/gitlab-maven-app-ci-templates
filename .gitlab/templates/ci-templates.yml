@@ -1,0 +1,60 @@
+include:
+    - local: .gitlab/templates/components.yml
+
+
+# __  __                       
+#|  \/  | __ ___   _____ _ __  
+#| |\/| |/ _` \ \ / / _ \ '_ \ 
+#| |  | | (_| |\ V /  __/ | | |
+#|_|  |_|\__,_| \_/ \___|_| |_|
+                              
+.build_maven_app_dev:
+    extends:
+        - .dev
+        - .maven_install
+
+.build_maven_app_prod:
+    extends:
+        - .prod
+        - .maven_install
+
+.test_maven_dev:
+    extends:
+        - .dev
+        - .maven_test
+
+.test_maven_prod:
+    extends:
+        - .prod
+        - .maven_test
+
+
+.compile_maven_dev:
+    extends:
+        - .dev
+        - .maven_compile
+
+.compile_maven_prod:
+    extends:
+        - .prod
+        - .maven_compile
+
+
+# ____             _             
+#|  _ \  ___   ___| | _____ _ __ 
+#| | | |/ _ \ / __| |/ / _ \ '__|
+#| |_| | (_) | (__|   <  __/ |   
+#|____/ \___/ \___|_|\_\___|_|   
+                                
+.deploy_docker_img_to_gcr_v2:
+  extends: .deploy_docker_common
+
+  variables:
+    DOCKER_FILE: Dockerfile
+    RELEASE_PROJECT: example-${ENV}
+    DOCKER_IMAGE_NAME: example-${ENV}
+  script:
+    - gcloud auth configure-docker
+    - docker build -f ${DOCKER_FILE} -t ${DOCKER_IMAGE_PATH}:${CI_PIPELINE_ID} .
+    - docker push ${DOCKER_IMAGE_PATH}:${CI_PIPELINE_ID}
+    - gcloud -q container images add-tag ${DOCKER_IMAGE_PATH}:${CI_PIPELINE_ID} ${DOCKER_IMAGE_PATH}:latest ${DOCKER_IMAGE_PATH}:${CI_COMMIT_SHA}
